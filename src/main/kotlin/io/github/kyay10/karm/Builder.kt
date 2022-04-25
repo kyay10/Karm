@@ -5,36 +5,64 @@ package io.github.kyay10.karm
 import kotlin.contracts.ExperimentalContracts
 import kotlin.contracts.contract
 
+@DslMarker
+annotation class ArmDsl
+
+//@ArmDsl
 open class ArmBuilder(
     override val instructions: MutableList<ArmOpCode> = mutableListOf(), val parent: ArmBuilder? = null
 ) : ArmBlockOpCode {
+    override var armName = ""
+
     val availableRegisters: MutableSet<ArmRegister> = (parent?.availableRegisters ?: builtInRegisters).toMutableSet()
     val usedRegisters: MutableSet<ArmRegister> = mutableSetOf()
+
+    val temporaryAddresses: MutableSet<TemporaryAddress> = mutableSetOf()
+    val childBuilders: MutableSet<ArmBuilder> = mutableSetOf()
 
     val usedAddressesCount get() = ownAddressesCount + maxChildAddressesCount
 
     // These are addresses that are available throughout the whole block
-    var ownAddressesCount = 0
+    val ownAddressesCount get() = temporaryAddresses.size
 
     // These are the maximum amount of addresses needed for each sub-block
-    var maxChildAddressesCount = 0
-        set(value) {
-            field = kotlin.math.max(field, value)
-        }
+    val maxChildAddressesCount: Int
+        get() = childBuilders.maxOfOrNull { it.usedAddressesCount } ?: 0
 
     var childDelegateForDelegates: ArmBuilder? = null
 
     open fun useRegister(register: ArmRegister) {
         markRegister(register)
-        if (availableRegisters.remove(register))
+        removeRegister(register)
+    }
+
+    open fun removeRegister(register: ArmRegister) {
+        if (availableRegisters.remove(register)) {
             usedRegisters.add(register)
+            // If this is a register that we own, then ensure we remove it from being available anywhere inside
+            // child builders. This is to fix a bug where ArmConditionalBuilders would receive an extra parameter
+            // while building, and so it'd remove a register, but the truthBlock would still have that removed
+            // register as available, and so it'd result in those registers not having an underlying value.
+            childBuilders.forEach {
+                it.removeRegister(register)
+            }
+        }
     }
 
     open fun useRegisters(registers: Set<ArmRegister>) {
         markRegisters(registers)
+        removeRegisters(registers)
+    }
+
+    open fun removeRegisters(registers: Set<ArmRegister>) {
         val ownRegisters = availableRegisters intersect registers
         availableRegisters.removeAll(ownRegisters)
         usedRegisters.addAll(ownRegisters)
+        if (ownRegisters.isNotEmpty()) {
+            childBuilders.forEach {
+                it.removeRegisters(registers)
+            }
+        }
     }
 
     open fun markRegister(register: ArmRegister) {
@@ -45,14 +73,12 @@ open class ArmBuilder(
         parent?.markRegisters(registers)
     }
 
-    override val armName = ""
-
-    operator fun <T : ArmOpCode> T.unaryPlus(): T = addInstruction(this)
-    fun <T : ArmOpCode> addInstruction(instruction: T): T = instruction.also {
-        instructions.add(it)
-        useRegisters(it.operands.filterIsInstance<ArmRegister>().toSet())
-        if (it is ArmBuilder) {
-            maxChildAddressesCount = it.usedAddressesCount
+    operator fun <T : ArmOpCode> T.unaryPlus() = addInstruction(this)
+    fun <T : ArmOpCode> addInstruction(instruction: T) {
+        instructions.add(instruction)
+        useRegisters(instruction.operands.filterIsInstance<ArmRegister>().toSet())
+        if (instruction is ArmBuilder) {
+            childBuilders.add(instruction)
         }
     }
 }
@@ -69,12 +95,7 @@ open class ArmSubroutineBuilder(
     override val parameters: Set<ArmRegister> = _parameters
 
     fun addParameter(parameter: ArmRegister) {
-        _parameters.add(parameter)
-        if (parameter !in parameters) availableRegisters.remove(availableRegisters.first())
-    }
-
-    fun addParameters(parameters: Iterable<ArmRegister>) {
-        parameters.forEach(::addParameter)
+        if (_parameters.add(parameter)) useRegister(availableRegisters.first())
     }
 
     val returnValue = RTemp(RNull)
@@ -85,7 +106,7 @@ open class ArmSubroutineBuilder(
 
     val end by labelWithPostfix("_end")
 
-    var baseName = name
+    override var armName = name
         set(newName) {
             field = newName
             refreshLabels()
@@ -93,28 +114,29 @@ open class ArmSubroutineBuilder(
 
     fun refreshLabels() {
         labelsDependentOnBaseName.forEach { (label, format) ->
-            label.armName = format.format(baseName)
+            label.armName = format.format(armName)
         }
         subroutinesDependentOnBaseName.forEach { (subroutine, format) ->
-            subroutine.baseName = format.format(baseName)
+            subroutine.armName = format.format(armName)
         }
     }
 
     fun labelWithPostfix(postfix: String): ArmLabel {
         val format = "%s$postfix"
-        val label = ArmLabel(format.format(baseName))
+        val label = ArmLabel(format.format(armName))
         labelsDependentOnBaseName[label] = format
         return label
     }
 
-    fun ArmBuilder.Return(value: ArmValueOperand? = null) {
+    context(ArmBuilder)
+    fun Return(value: ArmValueOperand? = null) {
         if (value != null) result = value
         branch(end)
     }
 
     init {
         availableRegisters.clear()
-        availableRegisters.addAll(builtInRegisters.map { RTemp(it) }.drop(parameters.size))
+        availableRegisters.addAll(builtInRegisters.map { RTemp(RNull) }.drop(parameters.size))
     }
 
     override fun markRegister(register: ArmRegister) {
@@ -124,7 +146,6 @@ open class ArmSubroutineBuilder(
     }
 
     override fun markRegisters(registers: Set<ArmRegister>) {
-        super.markRegisters(registers)
         for (register in registers) {
             markRegister(register)
         }
@@ -141,14 +162,16 @@ open class ArmSubroutineBuilder(
             }
         }
         val usedRegisters = parent.usedRegisters.filter { it !in parameters && it != register }.iterator()
-        val builder = ArmBuilder(instructions.toMutableList(), parent)
-        builder.maxChildAddressesCount = maxChildAddressesCount
-        builder.ownAddressesCount = ownAddressesCount
-        builder.ownAddressesCount += (internalRegisters.size - parent.availableRegisters.size).coerceAtLeast(0)
+        val builder = ArmBuilder(instructions.toMutableList(), parent).apply {
+            armName = this@ArmSubroutineBuilder.armName
+            temporaryAddresses.addAll(temporaryAddresses)
+            childBuilders.addAll(childBuilders)
+        }
+        //builder.ownAddressesCount will automatically increase because of builder.memory()
+        //builder.ownAddressesCount += (internalRegisters.size - parent.availableRegisters.size).coerceAtLeast(0)
         for (i in parent.availableRegisters.size until internalRegisters.size) {
             val usedRegister = usedRegisters.next()
-            val temporaryAddress = memory()
-            //TemporaryAddress(AVAILABLE_MEMORY - builder.usedAddressesCount + (i - parent.availableRegisters.size))
+            val temporaryAddress = builder.memory()
             builder.instructions.add(
                 0, StoreRegisterOpCode(usedRegister, temporaryAddress)
             )
@@ -180,20 +203,14 @@ inline fun ArmBuilder.buildArm(block: ArmBuilder.() -> Unit): ArmBuilder {
 }
 
 inline fun ArmBuilder.buildSubroutine(
-    name: String,
-    vararg localParameters: ArmValueOperand,
-    dependencies: Iterable<ArmValueOperand> = emptyList(),
-    block: ArmSubroutineBuilder.(LocalParameterList) -> Unit
+    name: String, vararg localParameters: ArmValueOperand, block: ArmSubroutineBuilder.(LocalParameterList) -> Unit
 ): ArmSubroutine {
     contract {
         callsInPlace(block, kotlin.contracts.InvocationKind.EXACTLY_ONCE)
     }
     val parameterList = localParameters.asList()
     val builder = ArmSubroutineBuilder(name, this, parameterList.collectRegisterParameters())
-    dependencies.forEach { if (it is ArmRegister) builder.addParameter(it) }
     withinBuilder(builder) { block(parameterList.localized()) }
-//    println(builder.baseName)
-    println(builder.parameters)
     return builder
 }
 
@@ -247,27 +264,3 @@ operator fun LocalParameterList.component19() = parameters[18]
 operator fun LocalParameterList.component20() = parameters[19]
 operator fun LocalParameterList.component21() = parameters[20]
 operator fun LocalParameterList.component22() = parameters[21]
-
-/*
-inline fun ArmBuilder.buildSubroutine(
-    name: String, block: ArmSubroutineBuilder.() -> Unit
-): ArmSubroutine {
-    contract {
-        callsInPlace(block, kotlin.contracts.InvocationKind.EXACTLY_ONCE)
-    }
-    val builder = ArmSubroutineBuilder(name, this, emptyList())
-    withinBuilder(builder, block)
-    println(builder.parameters)
-    return builder
-}
-
-inline fun ArmBuilder.buildSubroutine(
-    name: String, param1: ArmValueOperand, block: ArmSubroutineBuilder.(ArmValueOperand) -> Unit
-): ArmSubroutine {
-    contract {
-        callsInPlace(block, kotlin.contracts.InvocationKind.EXACTLY_ONCE)
-    }
-    return buildSubroutine(name) {
-        block(register(param1))
-    }
-}*/

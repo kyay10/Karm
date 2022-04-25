@@ -11,11 +11,7 @@ data class ArmProgression(
             operator fun iterator(): ArmProgressionIterator {
         val indexRegister = register()
         return ArmProgressionIterator(
-            start,
-            endInclusive,
-            step(given(), indexRegister),
-            indexRegister,
-            isIncreasingStep
+            start, endInclusive, step(given(), indexRegister), indexRegister, isIncreasingStep
         )
     }
 }
@@ -27,7 +23,7 @@ data class ArmProgressionIterator(
     val indexRegister: ArmRegister,
     val isIncreasingStep: Boolean = true
 ) {
-    val isFirstRun get() = !this::initializationAndConditionCheckBuilder.isInitialized
+    private val isFirstRun get() = !this::initializationAndConditionCheckBuilder.isInitialized
     lateinit var initializationAndConditionCheckBuilder: ArmBuilder
 
     val loopStart by labeled
@@ -35,9 +31,9 @@ data class ArmProgressionIterator(
 
     context(ArmBuilder) operator fun hasNext(): Boolean {
         return if (isFirstRun) {
-            initializationAndConditionCheckBuilder = +buildArm {
+            initializationAndConditionCheckBuilder = buildArm {
                 addInitializationAndConditionCheck(loopStart, loopEnd)
-            }
+            }.also { +it }
             true
         } else {
             val lastInstruction = instructions.last()
@@ -67,7 +63,7 @@ data class ArmProgressionIterator(
         indexRegister `<-` start
         label(loopStart)
         compare(indexRegister, endInclusive)
-        branch(loopEnd, if (isIncreasingStep) BranchCondition.GreaterThan else BranchCondition.LessThan)
+        branch(loopEnd, BranchCondition.LessThan.replaceIf(isIncreasingStep, BranchCondition::flipped))
     }
 
     context(ArmBuilder) operator fun next(): ArmValueOperand = indexRegister
@@ -76,8 +72,7 @@ data class ArmProgressionIterator(
 
 context(ArmBuilder)
 fun ArmProgression.forEach(
-    name: String,
-    action: context(BreakScope, ContinueScope) ArmBuilder.(ArmValueOperand) -> Unit
+    name: String, action: context(BreakScope, ContinueScope) ArmBuilder.(ArmValueOperand) -> Unit
 ) {
     for (element in this) loop(name) { action(given<BreakScope>(), given<ContinueScope>(), this, element) }
 }

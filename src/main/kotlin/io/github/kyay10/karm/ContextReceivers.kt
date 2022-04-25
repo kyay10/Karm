@@ -36,12 +36,7 @@ inline fun <A, B, C, D, R> withContexts(a: A, b: B, c: C, d: D, block: context(A
 }
 
 inline fun <A, B, C, D, E, R> withContexts(
-    a: A,
-    b: B,
-    c: C,
-    d: D,
-    e: E,
-    block: context(A, B, C, D, E) (TypeWrapper<E>) -> R
+    a: A, b: B, c: C, d: D, e: E, block: context(A, B, C, D, E) (TypeWrapper<E>) -> R
 ): R {
     contract {
         callsInPlace(block, InvocationKind.EXACTLY_ONCE)
@@ -50,13 +45,7 @@ inline fun <A, B, C, D, E, R> withContexts(
 }
 
 inline fun <A, B, C, D, E, F, R> withContexts(
-    a: A,
-    b: B,
-    c: C,
-    d: D,
-    e: E,
-    f: F,
-    block: context(A, B, C, D, E, F) (TypeWrapper<F>) -> R
+    a: A, b: B, c: C, d: D, e: E, f: F, block: context(A, B, C, D, E, F) (TypeWrapper<F>) -> R
 ): R {
     contract {
         callsInPlace(block, InvocationKind.EXACTLY_ONCE)
@@ -65,14 +54,7 @@ inline fun <A, B, C, D, E, F, R> withContexts(
 }
 
 inline fun <A, B, C, D, E, F, G, R> withContexts(
-    a: A,
-    b: B,
-    c: C,
-    d: D,
-    e: E,
-    f: F,
-    g: G,
-    block: context(A, B, C, D, E, F, G) (TypeWrapper<G>) -> R
+    a: A, b: B, c: C, d: D, e: E, f: F, g: G, block: context(A, B, C, D, E, F, G) (TypeWrapper<G>) -> R
 ): R {
     contract {
         callsInPlace(block, InvocationKind.EXACTLY_ONCE)
@@ -81,15 +63,7 @@ inline fun <A, B, C, D, E, F, G, R> withContexts(
 }
 
 inline fun <A, B, C, D, E, F, G, H, R> withContexts(
-    a: A,
-    b: B,
-    c: C,
-    d: D,
-    e: E,
-    f: F,
-    g: G,
-    h: H,
-    block: context(A, B, C, D, E, F, G, H) (TypeWrapper<H>) -> R
+    a: A, b: B, c: C, d: D, e: E, f: F, g: G, h: H, block: context(A, B, C, D, E, F, G, H) (TypeWrapper<H>) -> R
 ): R {
     contract {
         callsInPlace(block, InvocationKind.EXACTLY_ONCE)
@@ -227,14 +201,6 @@ sealed interface TypeWrapper<out A> {
 context(A) fun <A> given(): A = id()
 fun <A> A.id(): A = this
 
-// Doesn't work. Looks like contexts don't participate in flow typing
-fun <A> A?.requireNotNullContext() {
-    contract {
-        returns() implies (this@requireNotNullContext != null)
-    }
-    requireNotNull(this)
-}
-
 fun generateDeclarations(index: Int): String {
     val alphabet = "BCDEFGHIJKLMNOPQSTUVWXYZ"
     val letters = ("A" + alphabet.take(index)).toList()
@@ -253,34 +219,3 @@ fun generateDeclarations(index: Int): String {
     """.trimIndent()
     return codeTemplate
 }
-
-fun main() {
-    println(generateDeclarations(0))
-}
-/*
-
-inline fun <A, B, C, R> withContext(a: A, b: B, c: C, block: Contextual3<A, B, C, R>): R {
-    return with(a) { with(b) { with(c) { block.runInContext() } } }
-}
-fun interface Contextual3<A, B, C, R> {
-    context(A, B, C)
-    fun runInContext(): R
-}
-
-inline fun <A, B, C, R> withContexts(a: A, b: B, c: C, block: Contextuall3<A, B, C, R>): R {
-    return with(block) {
-        with(a) { with(b) { with(c) { createContext3(a, b, c).runInContext() } } }
-    }
-}
-
-fun interface Contextuall3<A, B, C, R> {
-    context(A, B, C)
-    fun Context3<A, B, C>.runInContext(): R
-}
-
-//context(A, B, C)
-class Context3<A, B, C>
-
-fun <A, B, C> createContext3(a: A, b: B, c: C): Context3<A, B, C> =
-    with(a) { with(b) { with(c) { Context3<A, B, C>() } } }
-*/

@@ -52,18 +52,6 @@ context(A) fun <T, A : Appendable> Iterable<T>.appendAll(
     appendAction: context(A) (T, TypeWrapper<A>) -> Unit
 ): A = joinAppending(given<A>(), separator, prefix, postfix, limit, truncated, appendAction)
 
-fun <T> Appendable.appendElement(element: T, transform: ((T) -> CharSequence)?) {
-    when {
-        transform != null -> append(transform(element))
-        element is CharSequence? -> append(element)
-        element is Char -> append(element)
-        else -> append(element.toString())
-    }
-}
-
-fun <T> Iterator<T>.nextOrNull() = if (hasNext()) next() else null
-fun <T> ListIterator<T>.previousOrNull() = if (hasPrevious()) previous() else null
-
 inline fun <T> Iterator<T>.nextUntilOrNull(predicate: (T) -> Boolean): T? {
     for (element in this) {
         if (predicate(element)) {
@@ -83,3 +71,10 @@ inline fun <T> ListIterator<T>.previousUntilOrNull(predicate: (T) -> Boolean): T
     return null
 }
 
+inline fun <reified T> setOfIsInstance(vararg elements: Any?) = buildSet(elements.size) {
+    for (element in elements) {
+        if (element is T) {
+            add(element)
+        }
+    }
+}

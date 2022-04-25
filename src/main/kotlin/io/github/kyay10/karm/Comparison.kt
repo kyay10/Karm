@@ -1,19 +1,21 @@
 package io.github.kyay10.karm
 
-fun ArmBuilder.compare(first: ArmValueOperand, second: ArmValueOperand): ArmOpCode = when (first) {
-    is ArmRegister -> when (second) {
-        is ArmRegisterOrConstant -> compare(first, second)
-        is ArmMemoryAddress, is ArmCalculationOperand -> call(buildSubroutine(
-            "compareRegisterWithCalc", first, second
-        ) { (first, second) ->
-            compare(first, second)
+fun ArmBuilder.compare(first: ArmValueOperand, second: ArmValueOperand) {
+    when (first) {
+        is ArmRegister -> when (second) {
+            is ArmRegisterOrConstant -> compare(first, second)
+            is ArmMemoryAddress, is ArmCalculationOperand -> call(buildSubroutine(
+                "compareRegisterWithCalc", first, second
+            ) { (first, second) ->
+                compare(first, second)
+            })
+        }
+        else -> call(buildSubroutine("compareNonRegisterWithOther") {
+            // Put anything that ain't a register into one, even constants
+            val temp by register(first)
+            compare(temp, second)
         })
     }
-    else -> call(buildSubroutine("compareNonRegisterWithOther") {
-        // Put anything that ain't a register into one, even constants
-        val temp by register(first)
-        compare(temp, second)
-    })
 }
 
 class ComparisonScope(name: String, parent: ArmBuilder) {
@@ -21,9 +23,7 @@ class ComparisonScope(name: String, parent: ArmBuilder) {
     var greaterThan: ArmLabel? = null
     var equal: ArmLabel? = null
     var notEqual: ArmLabel? = null
-    val subroutineBuilder = ArmSubroutineBuilder(
-        name, parent, parent.usedRegisters.toSet()
-    ) //TODO maybe we can allow use of used registers here
+    val subroutineBuilder = ArmSubroutineBuilder(name, parent, setOf())
 
     fun makeLabelForComparison(name: String, block: ArmBuilder.() -> Unit): ArmLabel {
         val label = label(name)
@@ -62,26 +62,11 @@ class ComparisonScope(name: String, parent: ArmBuilder) {
     fun notEqual(name: String, block: ArmBuilder.() -> Unit) {
         notEqual = makeLabelForComparison(name, block)
     }
-
-/*    fun Else(name: String, block: ArmBuilder.() -> Unit) {
-        val label = label(name)
-        lessThan = lessThan ?: label
-        greaterThan = greaterThan ?: label
-        equal = equal ?: label
-        notEqual = notEqual ?: label
-        subroutineBuilder.apply {
-            +buildArm {
-                label(label)
-                block()
-                Return()
-            }
-        }
-    }*/
 }
 
 context(ArmBuilder) fun ArmValueOperand.compare(
     other: ArmValueOperand, name: String, block: ComparisonScope.() -> Unit
-): ArmBlockOpCode = with(ComparisonScope(name, this@ArmBuilder)) {
+) = with(ComparisonScope(name, given<ArmBuilder>())) {
     withinBuilder(subroutineBuilder) {
         block()
     }
@@ -100,7 +85,7 @@ context(ArmBuilder) fun ArmValueOperand.compare(
         notEqual?.let { branchNotEqual(it) }
         if (equal == null || (notEqual == null && (lessThan == null || greaterThan == null))) {
             with(subroutineBuilder) {
-                this@buildArm.Return()
+                Return()
             }
         }
         call(subroutineBuilder)
@@ -108,142 +93,35 @@ context(ArmBuilder) fun ArmValueOperand.compare(
 }
 
 context(ArmBuilder) fun ArmValueOperand.compareSingle(other: ArmValueOperand, condition: BranchCondition) =
-    buildNegateableConditionalSubroutine("comparison", dependencies = listOf(this, other)) { shouldNegate, _ ->
+    buildNegateableConditionalSubroutine("comparison") { shouldNegate, _ ->
         result = 0.c
         labelsDependentOnBaseName[end] = "%s_false"
         refreshLabels()
-        compare(this@compareSingle, other)
-        branch(end, condition.negateIf(!shouldNegate))
+        if (this@compareSingle is ArmConstant) {
+            compare(other, this@compareSingle)
+            branch(end, condition.negateIf(!shouldNegate).flipped)
+        } else {
+            compare(this@compareSingle, other)
+            branch(end, condition.negateIf(!shouldNegate))
+        }
         result = 1.c
         markTruthful()
     }
 
 context(ArmBuilder) infix fun ArmValueOperand.lessThan(other: ArmValueOperand) =
-    compareSingle(other, BranchCondition.LessThan)
-        .also {
-            it.baseName = "lessThan"
-            it.negated.baseName = "greaterThanOrEqual"
-        }
-/*buildNegateableConditionalSubroutine("lessThan") { shouldNegate ->
-    result = 0.c
-    this@lessThan.compare(other, "lessThan") {
-        val label = makeLabelForComparison(if (shouldNegate) "greaterThanOrEqual" else "lessThan") {
-            result = 1.c
-            markTruthful()
-        }
-        if (shouldNegate) {
-            greaterThan = label
-            equal = label
-        } else {
-            lessThan = label
-        }
-        labelsDependentOnBaseName[label] = "%s"
-        subroutinesDependentOnBaseName[subroutineBuilder] = "%s"
-    }
-}*/
+    compareSingle(other, BranchCondition.LessThan).withUpdatedNames("lessThan", "greaterThanOrEqual")
 
 context(ArmBuilder) infix fun ArmValueOperand.lessThanOrEqual(other: ArmValueOperand) =
-    compareSingle(other, BranchCondition.LessThanOrEqual)
-        .also {
-            it.baseName = "lessThanOrEqual"
-            it.negated.baseName = "greaterThan"
-        }
-/*buildNegateableConditionalSubroutine("lessThanOrEqual") { shouldNegate ->
-    result = 0.c
-    this@lessThanOrEqual.compare(other, "lessThanOrEqual") {
-        val label = makeLabelForComparison(if (shouldNegate) "greaterThan" else "lessThanOrEqual") {
-            result = 1.c
-            markTruthful()
-        }
-        if (shouldNegate) {
-            greaterThan = label
-        } else {
-            lessThan = label
-            equal = label
-        }
-        labelsDependentOnBaseName[label] = "%s"
-        subroutinesDependentOnBaseName[subroutineBuilder] = "%s"
-    }
-}*/
+    compareSingle(other, BranchCondition.LessThanOrEqual).withUpdatedNames("lessThanOrEqual", "greaterThan")
 
 context(ArmBuilder) infix fun ArmValueOperand.greaterThan(other: ArmValueOperand) = !lessThanOrEqual(other)
-/*buildNegateableConditionalSubroutine("greaterThan") { shouldNegate ->
-    result = 0.c
-    this@greaterThan.compare(other, "greaterThan") {
-        val label = makeLabelForComparison(if (shouldNegate) "lessThanOrEqual" else "greaterThan") {
-            result = 1.c
-            markTruthful()
-        }
-        if (shouldNegate) {
-            lessThan = label
-            equal = label
-        } else {
-            greaterThan = label
-        }
-        labelsDependentOnBaseName[label] = "%s"
-        subroutinesDependentOnBaseName[subroutineBuilder] = "%s"
-    }
-}*/
 
 context(ArmBuilder) infix fun ArmValueOperand.greaterThanOrEqual(other: ArmValueOperand) = !lessThan(other)
-/*buildNegateableConditionalSubroutine("greaterThanOrEqual") { shouldNegate ->
-    result = 0.c
-    this@greaterThanOrEqual.compare(other, "greaterThanOrEqual") {
-        val label = makeLabelForComparison(if (shouldNegate) "lessThan" else "greaterThanOrEqual") {
-            result = 1.c
-            markTruthful()
-        }
-        if (shouldNegate) {
-            lessThan = label
-        } else {
-            greaterThan = label
-            equal = label
-        }
-        labelsDependentOnBaseName[label] = "%s"
-        subroutinesDependentOnBaseName[subroutineBuilder] = "%s"
-    }
-}*/
 
 context(ArmBuilder) infix fun ArmValueOperand.equal(other: ArmValueOperand) =
-    compareSingle(other, BranchCondition.Equal)
-        .also {
-            it.baseName = "areEqual"
-            it.negated.baseName = "areNotEqual"
-        }
-/*buildNegateableConditionalSubroutine("equal") { shouldNegate ->
-    result = 0.c
-    this@equal.compare(other, "equal") {
-        val label = makeLabelForComparison(if (shouldNegate) "areNotEqual" else "areEqual") {
-            result = 1.c
-            markTruthful()
-        }
-        if (shouldNegate) {
-            notEqual = label
-        } else {
-            equal = label
-        }
-        labelsDependentOnBaseName[label] = "%s"
-        subroutinesDependentOnBaseName[subroutineBuilder] = "%s"
-    }
-}*/
+    compareSingle(other, BranchCondition.Equal).withUpdatedNames("areEqual", "areNotEqual")
 
 context(ArmBuilder) infix fun ArmValueOperand.notEqual(other: ArmValueOperand) = !equal(other)
-/*buildNegateableConditionalSubroutine("equal") { shouldNegate ->
-    result = 0.c
-    this@notEqual.compare(other, "equal") {
-        val label = makeLabelForComparison(if (shouldNegate) "areEqual" else "areNotEqual") {
-            result = 1.c
-            markTruthful()
-        }
-        if (shouldNegate) {
-            equal = label
-        } else {
-            notEqual = label
-        }
-        labelsDependentOnBaseName[label] = "%s"
-        subroutinesDependentOnBaseName[subroutineBuilder] = "%s"
-    }
-}*/
 
 context(ArmBuilder)
         @Suppress("INVALID_CHARACTERS")

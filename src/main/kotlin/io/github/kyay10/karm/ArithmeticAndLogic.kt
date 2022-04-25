@@ -1,12 +1,12 @@
 package io.github.kyay10.karm
 
+//TODO: Change subroutines to not expose return value and instead just allow usage of the storage register if and only
+// if it isn't a parameter
 context(ArmBuilder) operator fun ArmValueOperand.plus(other: ArmValueOperand): ArmValueOperand = when (this) {
     is ArmRegister -> when (other) {
         is ArmRegisterOrConstant -> AddCalculation(this, other)
         is ArmMemoryAddress, is ArmCalculationOperand -> buildSubroutine(
-            "registerPlusCalc",
-            this,
-            other
+            "registerPlusCalc", this, other
         ) { (first, second) ->
             // For memory, this could be R1 = R1 + memory(x)
             // And so, we have to store the memory value somewhere other than the final register
@@ -42,7 +42,7 @@ context(ArmBuilder) operator fun ArmValueOperand.plus(other: ArmValueOperand): A
     }
     is ArmCalculationOperand -> when (other) {
         is ArmRegisterOrConstant, is ArmMemoryAddress -> other + this
-        is ArmCalculationOperand -> buildSubroutine("calcPlusCalc", this, dependencies = other.parameters) { (first) ->
+        is ArmCalculationOperand -> buildSubroutine("calcPlusCalc", this) { (first) ->
             // R1 = (R1 + R2) + (R1 + R2)
             // R2 could be chosen as temporary for the first (R1 + R2), which then messes up the result for the
             // second one.
@@ -59,9 +59,7 @@ context(ArmBuilder) operator fun ArmValueOperand.minus(other: ArmValueOperand): 
     is ArmRegister -> when (other) {
         is ArmRegisterOrConstant -> SubtractCalculation(this, other)
         is ArmMemoryAddress, is ArmCalculationOperand -> buildSubroutine(
-            "registerMinusCalc",
-            this,
-            other
+            "registerMinusCalc", this, other
         ) { (first, second) ->
             // For memory, this could be R1 = R1 - memory(x)
             // And so, we have to store the memory value somewhere other than the final register
@@ -116,7 +114,7 @@ context(ArmBuilder) operator fun ArmValueOperand.minus(other: ArmValueOperand): 
             result = other
             result = first - result
         }
-        is ArmCalculationOperand -> buildSubroutine("calcMinusCalc", this, dependencies = other.parameters) { (first) ->
+        is ArmCalculationOperand -> buildSubroutine("calcMinusCalc", this) { (first) ->
             // R1 = (R1 + R2) - (R1 - R2)
             // R2 could be chosen as temporary for the first (R1 + R2), which then messes up the result for the
             // second one.
@@ -133,10 +131,11 @@ context(ArmBuilder) fun ArmValueOperand.logical(other: ArmValueOperand, type: Lo
     when (this) {
         is ArmRegister -> when (other) {
             is ArmRegisterOrConstant -> LogicalCalculation(type, this, other)
-            is ArmMemoryAddress, is ArmCalculationOperand ->
-                buildSubroutine("registerLogicalCalc", this, other) { (first, second) ->
-                    result = first.logical(second, type)
-                }
+            is ArmMemoryAddress, is ArmCalculationOperand -> buildSubroutine(
+                "registerLogicalCalc", this, other
+            ) { (first, second) ->
+                result = first.logical(second, type)
+            }
         }
         is ArmConstant -> when (other) {
             is ArmConstant -> constant(
@@ -209,7 +208,6 @@ context(ArmBuilder) fun ArmValueOperand.logical(other: ArmValueOperand, type: Lo
                 result = first.logical(result, type)
             }
             is ArmCalculationOperand -> buildSubroutine("calcLogicalCalc", this) { (first) ->
-                addParameters(other.parameters)
                 // We need to ensure a completely independent storage from the second calculation so that we can store
                 // the first calculation inside of it, or vice versa
                 // Also, respect order of operation

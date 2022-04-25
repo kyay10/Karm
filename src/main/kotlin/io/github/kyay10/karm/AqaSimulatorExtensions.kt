@@ -7,13 +7,21 @@ package io.github.kyay10.karm
 annotation class AqaSimulatorExtension
 
 @AqaSimulatorExtension
-data class DataOpCode(val value: ArmConstant) : ArmOpCode {
+object AqaSimulatorExtensions
+
+@AqaSimulatorExtension
+data class DataOpCode private constructor(val value: ArmConstant) : ArmOpCode {
+    context(AqaSimulatorExtensions)
+    constructor(value: ArmConstant, unit: Unit = Unit) : this(value)
+
     override val armName = "DAT"
     override val operands = listOf(value)
 }
 
-@AqaSimulatorExtension
+context(AqaSimulatorExtensions)
+        @AqaSimulatorExtension
 fun data(value: ArmConstant) = DataOpCode(value)
 
-@AqaSimulatorExtension
+context(AqaSimulatorExtensions)
+        @AqaSimulatorExtension
 fun data(value: Int) = data(value.c)

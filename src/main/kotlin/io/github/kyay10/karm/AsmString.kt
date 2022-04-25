@@ -46,8 +46,8 @@ fun ArmElement.appendAsm() {
 }
 
 context(Appendable)
-fun ArmBuilder.appendFlattenedAsm() {
+fun FlattenedArmBuilder.appendFlattenedAsm() {
     instructions.appendAllAsm("\n")
 }
 
-fun ArmBuilder.toAsmString(): String = buildString { appendFlattenedAsm() }
+fun FlattenedArmBuilder.toAsmString(): String = buildString { appendFlattenedAsm() }

@@ -12,7 +12,7 @@ context(ContinueScope, ArmBuilder) fun Continue() = branch(continueLabel)
 
 context(ArmBuilder) fun While(
     condition: ArmValueOperand, name: String, block: context(BreakScope, ContinueScope) ArmBuilder.() -> Unit
-): ArmOpCode = +buildArm {
+) = +buildArm {
     val loopStart by label(name)
     label(loopStart)
     If(condition, name) {
@@ -27,7 +27,7 @@ context(ArmBuilder) fun For(
     incrementer: ArmBuilder.(ArmRegister) -> Unit,
     name: String,
     block: context(BreakScope, ContinueScope) ArmBuilder.(ArmValueOperand) -> Unit
-): ArmOpCode = +buildArm {
+) = +buildArm {
     val index = register(initializer)
     val incrementerLabel by label(name + "_incrementer")
     While(condition(this, index), name) {
@@ -38,18 +38,16 @@ context(ArmBuilder) fun For(
 }
 
 class ArmRepeatableBlockBuilder(
-    name: String,
-    parent: ArmBuilder,
-    instructions: MutableList<ArmOpCode> = mutableListOf()
+    name: String, parent: ArmBuilder, instructions: MutableList<ArmOpCode> = mutableListOf()
 ) : ArmBuilder(instructions, parent) {
     val blockStart by label(name)
     val blockEnd by label(name + "_end")
 }
 
-context(ArmBuilder) fun loop(name: String, block: context(BreakScope, ContinueScope) ArmBuilder.() -> Unit): ArmOpCode {
+context(ArmBuilder) fun loop(name: String, block: context(BreakScope, ContinueScope) ArmBuilder.() -> Unit) {
     val repeatableBlock = ArmRepeatableBlockBuilder(name, given())
     withinBuilder(repeatableBlock) {
         block(BreakScope(blockEnd), ContinueScope(blockStart), this)
     }
-    return +repeatableBlock
+    +repeatableBlock
 }

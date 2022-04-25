@@ -2,56 +2,54 @@ package io.github.kyay10.karm
 
 import kotlin.reflect.KProperty
 
-context(ArmBuilder) fun ArmRegister.assignFrom(value: ArmValueOperand): ArmOpCode = when (value) {
-    is ArmRegisterOrConstant -> move(this, value)
-    is ArmMemoryAddress -> load(this, value)
-    is ArmCalculationOperand -> +value.storeInto(this, this@ArmBuilder)
+context(ArmBuilder) fun ArmRegister.assignFrom(value: ArmValueOperand) {
+    when (value) {
+        is ArmRegisterOrConstant -> move(this, value)
+        is ArmMemoryAddress -> load(this, value)
+        is ArmCalculationOperand -> +value.storeInto(this, given<ArmBuilder>())
+    }
 }
 
-context(ArmBuilder) fun ArmMemoryAddress.assignFrom(value: ArmValueOperand): ArmOpCode = when (value) {
-    is ArmRegister -> store(value, this)
-    is ArmMemoryAddress, is ArmConstant, is ArmCalculationOperand -> call(buildSubroutine(
-        "setMemoryAddress"
-    ) {
-        store(into = this@assignFrom, from = register(value))
-    })
+context(ArmBuilder) fun ArmMemoryAddress.assignFrom(value: ArmValueOperand) {
+    when (value) {
+        is ArmRegister -> store(value, this)
+        is ArmMemoryAddress, is ArmConstant, is ArmCalculationOperand -> call(buildSubroutine(
+            "setMemoryAddress"
+        ) {
+            store(into = this@assignFrom, from = register(value))
+        })
+    }
 }
 
-context(ArmBuilder) fun ArmStorageOperand.assignFrom(value: ArmValueOperand): ArmOpCode = when (this) {
-    is ArmRegister -> assignFrom(value)
-    is ArmMemoryAddress -> assignFrom(value)
+context(ArmBuilder) fun ArmStorageOperand.assignFrom(value: ArmValueOperand) {
+    when (this) {
+        is ArmRegister -> assignFrom(value)
+        is ArmMemoryAddress -> assignFrom(value)
+    }
 }
 
-context(ArmBuilder) fun ArmValueOperand.storeInto(storage: ArmStorageOperand): ArmOpCode = storage.assignFrom(this)
+context(ArmBuilder) fun ArmValueOperand.storeInto(storage: ArmStorageOperand) = storage.assignFrom(this)
 
 context(ArmBuilder)
         @Suppress("INVALID_CHARACTERS")
         @JvmName("arrowAssign")
-        infix fun ArmStorageOperand.`<-`(value: ArmValueOperand) {
-    assignFrom(value)
-}
+        infix fun ArmStorageOperand.`<-`(value: ArmValueOperand) = assignFrom(value)
+
 
 context(ArmBuilder)
         @Suppress("INVALID_CHARACTERS")
         @JvmName("dotAssign")
-fun ArmStorageOperand.`=`(value: ArmValueOperand) {
-    assignFrom(value)
-}
+fun ArmStorageOperand.`=`(value: ArmValueOperand) = assignFrom(value)
 
 context(ArmBuilder)
         @Suppress("INVALID_CHARACTERS")
         @JvmName("colonAssign")
-        infix fun ArmStorageOperand.`:=`(value: ArmValueOperand) {
-    assignFrom(value)
-}
+        infix fun ArmStorageOperand.`:=`(value: ArmValueOperand) = assignFrom(value)
 
 context(ArmBuilder)
         @Suppress("INVALID_CHARACTERS")
         @JvmName("arrowStore")
-        infix fun ArmValueOperand.`->`(storage: ArmStorageOperand) {
-    storeInto(storage)
-
-}
+        infix fun ArmValueOperand.`->`(storage: ArmStorageOperand) = storeInto(storage)
 
 context(ArmBuilder) operator fun ArmRegister.provideDelegate(thisRef: Any?, property: KProperty<*>): ArmRegister =
     this.apply { useRegister(this) }
@@ -59,7 +57,7 @@ context(ArmBuilder) operator fun ArmRegister.provideDelegate(thisRef: Any?, prop
 context(ArmBuilder) operator fun ArmStorageOperand.getValue(thisRef: Any?, property: KProperty<*>): ArmValueOperand =
     this.also {
         childDelegateForDelegates.let {
-            if (it is ArmSubroutineBuilder && this@getValue is ArmRegister) it.addParameter(this@getValue)
+            if (it is ArmSubroutineBuilder && this is ArmRegister) it.addParameter(this)
         }
     }
 
@@ -84,5 +82,5 @@ fun ArmBuilder.swap(first: ArmStorageOperand, second: ArmStorageOperand) = call(
 context(ArmBuilder)
         @Suppress("INVALID_CHARACTERS")
         @JvmName("arrowSwap")
-        infix fun ArmStorageOperand.`<->`(second: ArmStorageOperand) = swap(this, second)
+        infix fun ArmStorageOperand.`<->`(other: ArmStorageOperand) = swap(this, other)
 

@@ -103,9 +103,7 @@ class LabelOpCode(val label: ArmLabel) : ArmOpCode {
     }
 
     override val operands = listOf(label)
-    override val armName = "LABEL"
-    var includeNoOp = false
-
+    override val armName = "LABEL $label"
 }
 
 sealed class ArmMemoryAddress(open val address: Int) : ArmStorageOperand {
@@ -176,6 +174,19 @@ enum class BranchCondition(override val armName: String) : ArmElement {
             LessThan -> GreaterThanOrEqual
             GreaterThanOrEqual -> LessThan
             LessThanOrEqual -> GreaterThan
+        }
+
+    /**
+     * Flips the condition so that numbers less than in become greater than it and vice versa.
+     * Doesn't affect equality.
+     */
+    val flipped
+        get(): BranchCondition = when (this) {
+            Always, Never, Equal, NotEqual -> this
+            GreaterThan -> LessThan
+            LessThan -> GreaterThan
+            GreaterThanOrEqual -> LessThanOrEqual
+            LessThanOrEqual -> GreaterThanOrEqual
         }
 
     infix fun or(other: BranchCondition): BranchCondition = when (this) {
@@ -275,21 +286,21 @@ object HaltOpCode : ArmOpCode {
 
 data class AddCalculation(val first: ArmRegister, val second: ArmRegisterOrConstant) : ArmCalculationOperand {
     override val armName = "+"
-    override val parameters = listOf(first, second).filterIsInstance<ArmRegister>().toSet()
+    override val parameters = setOfIsInstance<ArmRegister>(first, second)
 
     override fun storeInto(register: ArmRegister, parent: ArmBuilder) = AddOpCode(register, first, second)
 }
 
 data class SubtractCalculation(val first: ArmRegister, val second: ArmRegisterOrConstant) : ArmCalculationOperand {
     override val armName = "-"
-    override val parameters = listOf(first, second).filterIsInstance<ArmRegister>().toSet()
+    override val parameters = setOfIsInstance<ArmRegister>(first, second)
 
     override fun storeInto(register: ArmRegister, parent: ArmBuilder) = SubtractOpCode(register, first, second)
 }
 
 data class NotCalculation(val value: ArmRegisterOrConstant) : ArmCalculationOperand {
     override val armName = "!"
-    override val parameters = listOf(value).filterIsInstance<ArmRegister>().toSet()
+    override val parameters = setOfIsInstance<ArmRegister>(value)
 
     override fun storeInto(register: ArmRegister, parent: ArmBuilder) = MoveOpCode(register, value, isNot = true)
 }
@@ -304,7 +315,7 @@ data class LogicalCalculation(
         LogicalOperation.ShiftLeft -> "<<"
         LogicalOperation.ShiftRight -> ">>"
     }
-    override val parameters = listOf(first, second).filterIsInstance<ArmRegister>().toSet()
+    override val parameters = setOfIsInstance<ArmRegister>(first, second)
 
     override fun storeInto(register: ArmRegister, parent: ArmBuilder) =
         LogicalOpCode(operation, register, first, second)

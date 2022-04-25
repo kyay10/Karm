@@ -13,15 +13,22 @@ open class ArmConditionalSubroutineBuilder(
     fun ArmBuilder.markTruthful() = +truthBlock
 }
 
+fun ArmConditionalSubroutineBuilder.updateNames(newName: String, negatedName: String) {
+    armName = newName
+    negated.armName = negatedName
+}
+
+fun ArmConditionalSubroutineBuilder.withUpdatedNames(newName: String, negatedName: String) = apply {
+    updateNames(newName, negatedName)
+}
+
 inline fun ArmBuilder.buildConditionalSubroutine(
     name: String,
     vararg parameters: ArmValueOperand,
-    dependencies: Iterable<ArmValueOperand> = emptyList(),
     block: ArmConditionalSubroutineBuilder.(LocalParameterList) -> Unit
 ): ArmConditionalSubroutineBuilder {
     val parameterList = parameters.asList()
     val builder = ArmConditionalSubroutineBuilder(name, this, parameterList.collectRegisterParameters())
-    dependencies.forEach { if (it is ArmRegister) builder.addParameter(it) }
     withinBuilder(builder) { block(parameterList.localized()) }
     builder.negated = ArmConditionalSubroutineBuilder(name, this, builder.parameters)
     withinBuilder(builder.negated) {
@@ -47,20 +54,17 @@ inline fun ArmBuilder.buildConditionalSubroutine(
 inline fun ArmBuilder.buildNegateableConditionalSubroutine(
     name: String,
     vararg parameters: ArmValueOperand,
-    dependencies: Iterable<ArmValueOperand> = emptyList(),
     block: ArmConditionalSubroutineBuilder.(shouldNegate: Boolean, LocalParameterList) -> Unit
 ): ArmConditionalSubroutineBuilder {
     val parameterList = parameters.asList()
     val builder = ArmConditionalSubroutineBuilder(name, this, parameterList.collectRegisterParameters())
-    dependencies.forEach { if (it is ArmRegister) builder.addParameter(it) }
     withinBuilder(builder) {
         block(false, parameterList.localized())
     }
-    builder.negated = ArmConditionalSubroutineBuilder(name, this, builder.parameters)
+    builder.negated = ArmConditionalSubroutineBuilder(name, this, parameterList.collectRegisterParameters())
     withinBuilder(builder.negated) {
         block(true, parameterList.localized())
     }
-    println(builder.parameters)
     builder.negated.negated = builder
     return builder
 }
