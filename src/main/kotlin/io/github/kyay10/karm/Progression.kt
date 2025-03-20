@@ -1,5 +1,7 @@
 package io.github.kyay10.karm
 
+import io.github.kyay10.prettifykotlin.Pretty
+
 // step: given the value of the current index, calculate the next index
 data class ArmProgression(
     val start: ArmValueOperand,
@@ -49,7 +51,7 @@ data class ArmProgressionIterator(
             } else loopEnd
             +buildArm {
                 if (lastInstruction is ArmRepeatableBlockBuilder) label(lastInstruction.blockStart)
-                indexRegister `<-` step
+                indexRegister arrowAssign step
                 branch(loopStart)
                 label(loopEnd)
             }
@@ -60,7 +62,7 @@ data class ArmProgressionIterator(
     private fun ArmBuilder.addInitializationAndConditionCheck(
         loopStart: ArmLabel, loopEnd: ArmLabel
     ) {
-        indexRegister `<-` start
+        indexRegister arrowAssign start
         label(loopStart)
         compare(indexRegister, endInclusive)
         branch(loopEnd, BranchCondition.LessThan.replaceIf(isIncreasingStep, BranchCondition::flipped))
@@ -83,7 +85,7 @@ context(ArmBuilder)
 }
 
 context(ArmBuilder)
-        infix fun ArmValueOperand.until(other: ArmValueOperand): ArmProgression {
+        operator fun ArmValueOperand.rangeUntil(other: ArmValueOperand): ArmProgression {
     return ArmProgression(this, other - 1.c, isIncreasingStep = true) { it + 1.c }
 }
 
@@ -103,15 +105,7 @@ infix fun ArmProgression.step(block: context(ArmBuilder) (ArmValueOperand) -> Ar
 infix fun ArmProgression.stepDown(block: context(ArmBuilder) (ArmValueOperand) -> ArmValueOperand) =
     copy(step = block, isIncreasingStep = false)
 
+@Pretty(">>")
 infix fun ArmProgression.shr(amount: ArmValueOperand) = this stepDown { it shr amount }
+@Pretty("<<")
 infix fun ArmProgression.shl(amount: ArmValueOperand) = this step { it shl amount }
-context(ArmBuilder)
-        @Suppress("INVALID_CHARACTERS")
-        @JvmName("shiftLeft")
-        infix fun ArmProgression.`<<`(other: ArmValueOperand) = this shl other
-
-context(ArmBuilder)
-        @Suppress("INVALID_CHARACTERS")
-        @JvmName("shiftRight")
-        infix fun ArmProgression.`>>`(other: ArmValueOperand) = this shr other
-

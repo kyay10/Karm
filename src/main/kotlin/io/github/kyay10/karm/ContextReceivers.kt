@@ -1,4 +1,5 @@
 @file:OptIn(ExperimentalContracts::class)
+@file:Suppress("SUBTYPING_BETWEEN_CONTEXT_RECEIVERS")
 
 package io.github.kyay10.karm
 

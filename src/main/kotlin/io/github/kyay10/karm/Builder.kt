@@ -2,6 +2,7 @@
 
 package io.github.kyay10.karm
 
+import io.github.kyay10.prettifykotlin.Pretty
 import kotlin.contracts.ExperimentalContracts
 import kotlin.contracts.contract
 
@@ -202,6 +203,7 @@ inline fun ArmBuilder.buildArm(block: ArmBuilder.() -> Unit): ArmBuilder {
     return builder
 }
 
+@Pretty("λ")
 inline fun ArmBuilder.buildSubroutine(
     name: String, vararg localParameters: ArmValueOperand, block: ArmSubroutineBuilder.(LocalParameterList) -> Unit
 ): ArmSubroutine {

@@ -81,7 +81,7 @@ context(ArmBuilder) val ArmValueOperand.bool: ArmValueOperand
     get() = when (this) {
         is ArmConstant -> constant(if (value == 0) 0 else 1)
         is ArmConditionalSubroutineBuilder -> this
-        else -> this `!=` 0.c
+        else -> this notEqual 0.c
     }
 
 context(ArmBuilder) fun bool(operand: ArmValueOperand) = operand.bool

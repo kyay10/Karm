@@ -1,5 +1,7 @@
 package io.github.kyay10.karm
 
+import io.github.kyay10.prettifykotlin.AutoLambda
+
 @JvmInline
 value class BreakScope(val breakLabel: ArmLabel)
 
@@ -21,12 +23,13 @@ context(ArmBuilder) fun While(
     }
 }
 
-context(ArmBuilder) fun For(
+context(ArmBuilder)
+fun For(
     initializer: ArmValueOperand? = null,
-    condition: ArmBuilder.(ArmValueOperand) -> ArmValueOperand,
-    incrementer: ArmBuilder.(ArmRegister) -> Unit,
+    @AutoLambda("", ": ", "") condition: ArmBuilder.(ArmValueOperand) -> ArmValueOperand,
+    @AutoLambda("", ": ", "") incrementer: ArmBuilder.(ArmRegister) -> Unit,
     name: String,
-    block: context(BreakScope, ContinueScope) ArmBuilder.(ArmValueOperand) -> Unit
+    @AutoLambda("", ": ", "") block: context(BreakScope, ContinueScope) ArmBuilder.(ArmValueOperand) -> Unit
 ) = +buildArm {
     val index = register(initializer)
     val incrementerLabel by label(name + "_incrementer")

@@ -15,7 +15,7 @@ context(ArmBuilder) fun If(
 ): IfCall {
     val endOfTruthBlock: ArmBuilder
     +buildArm {
-        val conditionalSubroutine = if (condition is ArmConditionalSubroutineBuilder) condition else condition `!=` 0.c
+        val conditionalSubroutine = if (condition is ArmConditionalSubroutineBuilder) condition else condition notEqual 0.c
         conditionalSubroutine.armName = name
         call(conditionalSubroutine.also {
             withinBuilder(conditionalSubroutine.truthBlock) {

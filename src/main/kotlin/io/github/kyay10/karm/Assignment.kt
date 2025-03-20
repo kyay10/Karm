@@ -1,5 +1,6 @@
 package io.github.kyay10.karm
 
+import io.github.kyay10.prettifykotlin.Pretty
 import kotlin.reflect.KProperty
 
 context(ArmBuilder) fun ArmRegister.assignFrom(value: ArmValueOperand) {
@@ -28,28 +29,22 @@ context(ArmBuilder) fun ArmStorageOperand.assignFrom(value: ArmValueOperand) {
     }
 }
 
-context(ArmBuilder) fun ArmValueOperand.storeInto(storage: ArmStorageOperand) = storage.assignFrom(this)
+context(ArmBuilder)
+@Pretty("->")
+infix fun ArmValueOperand.storeInto(storage: ArmStorageOperand) = storage.assignFrom(this)
 
 context(ArmBuilder)
-        @Suppress("INVALID_CHARACTERS")
-        @JvmName("arrowAssign")
-        infix fun ArmStorageOperand.`<-`(value: ArmValueOperand) = assignFrom(value)
+@Pretty("<-")
+infix fun ArmStorageOperand.arrowAssign(value: ArmValueOperand) = assignFrom(value)
 
 
 context(ArmBuilder)
-        @Suppress("INVALID_CHARACTERS")
-        @JvmName("dotAssign")
-fun ArmStorageOperand.`=`(value: ArmValueOperand) = assignFrom(value)
+@Pretty("=")
+fun ArmStorageOperand.assign(value: ArmValueOperand) = assignFrom(value)
 
 context(ArmBuilder)
-        @Suppress("INVALID_CHARACTERS")
-        @JvmName("colonAssign")
-        infix fun ArmStorageOperand.`:=`(value: ArmValueOperand) = assignFrom(value)
-
-context(ArmBuilder)
-        @Suppress("INVALID_CHARACTERS")
-        @JvmName("arrowStore")
-        infix fun ArmValueOperand.`->`(storage: ArmStorageOperand) = storeInto(storage)
+@Pretty(":=")
+infix fun ArmStorageOperand.colonAssign(value: ArmValueOperand) = assignFrom(value)
 
 context(ArmBuilder) operator fun ArmRegister.provideDelegate(thisRef: Any?, property: KProperty<*>): ArmRegister =
     this.apply { useRegister(this) }
@@ -73,14 +68,11 @@ context(ArmBuilder) operator fun ArmStorageOperand.setValue(
     } ?: assignFrom(value)
 }
 
-fun ArmBuilder.swap(first: ArmStorageOperand, second: ArmStorageOperand) = call(buildSubroutine("swap") {
-    val temp by register(first)
-    first `<-` second
-    second `<-` temp
-})
-
 context(ArmBuilder)
-        @Suppress("INVALID_CHARACTERS")
-        @JvmName("arrowSwap")
-        infix fun ArmStorageOperand.`<->`(other: ArmStorageOperand) = swap(this, other)
+@Pretty("<->")
+infix fun ArmStorageOperand.swap(other: ArmStorageOperand) = call(buildSubroutine("swap") {
+    val temp by register(this@swap)
+    this@swap arrowAssign other
+    other arrowAssign temp
+})
 

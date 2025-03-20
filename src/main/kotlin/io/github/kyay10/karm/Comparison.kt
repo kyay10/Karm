@@ -1,5 +1,7 @@
 package io.github.kyay10.karm
 
+import io.github.kyay10.prettifykotlin.Pretty
+
 fun ArmBuilder.compare(first: ArmValueOperand, second: ArmValueOperand) {
     when (first) {
         is ArmRegister -> when (second) {
@@ -108,47 +110,29 @@ context(ArmBuilder) fun ArmValueOperand.compareSingle(other: ArmValueOperand, co
         markTruthful()
     }
 
-context(ArmBuilder) infix fun ArmValueOperand.lessThan(other: ArmValueOperand) =
+context(ArmBuilder)
+@Pretty("<")
+infix fun ArmValueOperand.lessThan(other: ArmValueOperand) =
     compareSingle(other, BranchCondition.LessThan).withUpdatedNames("lessThan", "greaterThanOrEqual")
 
-context(ArmBuilder) infix fun ArmValueOperand.lessThanOrEqual(other: ArmValueOperand) =
+context(ArmBuilder)
+@Pretty("<=")
+infix fun ArmValueOperand.lessThanOrEqual(other: ArmValueOperand) =
     compareSingle(other, BranchCondition.LessThanOrEqual).withUpdatedNames("lessThanOrEqual", "greaterThan")
 
-context(ArmBuilder) infix fun ArmValueOperand.greaterThan(other: ArmValueOperand) = !lessThanOrEqual(other)
+context(ArmBuilder)
+@Pretty(">")
+infix fun ArmValueOperand.greaterThan(other: ArmValueOperand) = !lessThanOrEqual(other)
 
-context(ArmBuilder) infix fun ArmValueOperand.greaterThanOrEqual(other: ArmValueOperand) = !lessThan(other)
+context(ArmBuilder)
+@Pretty(">=")
+infix fun ArmValueOperand.greaterThanOrEqual(other: ArmValueOperand) = !lessThan(other)
 
-context(ArmBuilder) infix fun ArmValueOperand.equal(other: ArmValueOperand) =
+context(ArmBuilder)
+@Pretty("==")
+infix fun ArmValueOperand.equal(other: ArmValueOperand) =
     compareSingle(other, BranchCondition.Equal).withUpdatedNames("areEqual", "areNotEqual")
 
-context(ArmBuilder) infix fun ArmValueOperand.notEqual(other: ArmValueOperand) = !equal(other)
-
 context(ArmBuilder)
-        @Suppress("INVALID_CHARACTERS")
-        @JvmName("_lessThan")
-        infix fun ArmValueOperand.`<`(other: ArmValueOperand) = this lessThan other
-
-context(ArmBuilder)
-        @Suppress("INVALID_CHARACTERS")
-        @JvmName("_lessThanOrEqual")
-        infix fun ArmValueOperand.`<=`(other: ArmValueOperand) = this lessThanOrEqual other
-
-context(ArmBuilder)
-        @Suppress("INVALID_CHARACTERS")
-        @JvmName("_greaterThan")
-        infix fun ArmValueOperand.`>`(other: ArmValueOperand) = this greaterThan other
-
-context(ArmBuilder)
-        @Suppress("INVALID_CHARACTERS")
-        @JvmName("_greaterThanOrEqual")
-        infix fun ArmValueOperand.`>=`(other: ArmValueOperand) = this greaterThanOrEqual other
-
-context(ArmBuilder)
-        @Suppress("INVALID_CHARACTERS")
-        @JvmName("_equal")
-        infix fun ArmValueOperand.`==`(other: ArmValueOperand) = this equal other
-
-context(ArmBuilder)
-        @Suppress("INVALID_CHARACTERS")
-        @JvmName("_notEqual")
-        infix fun ArmValueOperand.`!=`(other: ArmValueOperand) = this notEqual other
+@Pretty("!=")
+infix fun ArmValueOperand.notEqual(other: ArmValueOperand) = !equal(other)

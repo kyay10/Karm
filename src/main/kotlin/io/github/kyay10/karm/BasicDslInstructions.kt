@@ -1,10 +1,14 @@
 package io.github.kyay10.karm
 
+import io.github.kyay10.prettifykotlin.*
 import kotlin.properties.PropertyDelegateProvider
 import kotlin.reflect.KProperty
 
 fun R(index: Int): ArmRegister = builtInRegisters.getOrElse(index) { RCustom(index) }
+@Pretty("#")
+@Prefix("", "")
 fun constant(value: Int): ArmConstant = ArmConstant(value)
+@Postfix("")
 val Int.c: ArmConstant get() = constant(this)
 fun label(name: String): ArmLabel = ArmLabel(name)
 fun memory(address: Int): ArmMemoryAddress = MemoryAddress(address)
@@ -17,6 +21,8 @@ operator fun ArmLabel.getValue(thisRef: Any?, property: KProperty<*>) = this
 //TODO: should really be called ref, but does it matter?
 val ArmValueOperand.out get() = this as ArmStorageOperand
 
+@Pretty("")
+@Prefix("", ":")
 fun ArmBuilder.label(label: ArmLabel) = +LabelOpCode(label)
 fun ArmBuilder.load(into: ArmRegister, from: ArmMemoryAddress) = +LoadRegisterOpCode(into, from)
 

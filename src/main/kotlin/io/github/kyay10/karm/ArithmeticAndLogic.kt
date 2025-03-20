@@ -1,5 +1,8 @@
 package io.github.kyay10.karm
 
+import io.github.kyay10.prettifykotlin.Prefix
+import io.github.kyay10.prettifykotlin.Pretty
+
 //TODO: Change subroutines to not expose return value and instead just allow usage of the storage register if and only
 // if it isn't a parameter
 context(ArmBuilder) operator fun ArmValueOperand.plus(other: ArmValueOperand): ArmValueOperand = when (this) {
@@ -217,31 +220,29 @@ context(ArmBuilder) fun ArmValueOperand.logical(other: ArmValueOperand, type: Lo
         }
     }
 
-context(ArmBuilder) infix fun ArmValueOperand.and(other: ArmValueOperand) = logical(other, LogicalOperation.And)
-context(ArmBuilder) infix fun ArmValueOperand.or(other: ArmValueOperand) = logical(other, LogicalOperation.Or)
-context(ArmBuilder) infix fun ArmValueOperand.xor(other: ArmValueOperand) = logical(other, LogicalOperation.ExclusiveOr)
-context(ArmBuilder) infix fun ArmValueOperand.shl(other: ArmValueOperand) = logical(other, LogicalOperation.ShiftLeft)
-context(ArmBuilder) infix fun ArmValueOperand.shr(other: ArmValueOperand) = logical(other, LogicalOperation.ShiftRight)
 
-context(ArmBuilder) infix fun ArmValueOperand.`&`(other: ArmValueOperand) = this and other
+context(ArmBuilder) 
+@Pretty("&") 
+infix fun ArmValueOperand.and(other: ArmValueOperand) = logical(other, LogicalOperation.And)
 
 context(ArmBuilder)
-        @JvmName("_or")
-        infix fun ArmValueOperand.`|`(other: ArmValueOperand) = this or other
-
-context(ArmBuilder) infix fun ArmValueOperand.`^`(other: ArmValueOperand) = this xor other
+@Pretty("|")
+infix fun ArmValueOperand.or(other: ArmValueOperand) = logical(other, LogicalOperation.Or)
 
 context(ArmBuilder)
-        @Suppress("INVALID_CHARACTERS")
-        @JvmName("shiftLeft")
-        infix fun ArmValueOperand.`<<`(other: ArmValueOperand) = this shl other
+@Pretty("^")
+infix fun ArmValueOperand.xor(other: ArmValueOperand) = logical(other, LogicalOperation.ExclusiveOr)
 
 context(ArmBuilder)
-        @Suppress("INVALID_CHARACTERS")
-        @JvmName("shiftRight")
-        infix fun ArmValueOperand.`>>`(other: ArmValueOperand) = this shr other
+@Pretty(">>")
+infix fun ArmValueOperand.shl(other: ArmValueOperand) = logical(other, LogicalOperation.ShiftLeft)
 
-context(ArmBuilder) fun ArmValueOperand.inv(): ArmValueOperand = when (this) {
+context(ArmBuilder)
+@Pretty("<<")
+infix fun ArmValueOperand.shr(other: ArmValueOperand) = logical(other, LogicalOperation.ShiftRight)
+
+context(ArmBuilder)
+fun ArmValueOperand.inv(unit: Unit = Unit): ArmValueOperand = when (this) {
     is ArmConstant -> constant(this.value.inv())
     is ArmRegister -> NotCalculation(this)
     is ArmMemoryAddress, is ArmCalculationOperand -> buildSubroutine("notCalc") {
@@ -250,13 +251,19 @@ context(ArmBuilder) fun ArmValueOperand.inv(): ArmValueOperand = when (this) {
     }
 }
 
-context(ArmBuilder) val ArmValueOperand.`~` get() = inv()
-context(ArmBuilder) fun `~`(value: ArmValueOperand) = value.`~`
+context(ArmBuilder)
+@Pretty("~")
+val ArmValueOperand.inv get() = inv()
+
+context(ArmBuilder)
+@Pretty("~")
+@Prefix("", "")
+fun inv(value: ArmValueOperand) = value.inv
 
 context(ArmBuilder) operator fun ArmValueOperand.unaryMinus(): ArmValueOperand = when (this) {
     is ArmConstant -> constant(-value)
     is ArmRegister, is ArmMemoryAddress, is ArmCalculationOperand -> buildSubroutine("minusNonConstant") {
-        result = `~`(this@unaryMinus)
+        result = inv(this@unaryMinus)
         result += 1.c
     }
 }

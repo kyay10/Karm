@@ -3,22 +3,23 @@ package io.github.kyay10.karm
 fun main() {
     println(buildArm {
         var output by R1
-        R0 `<-` 40.c
-        R2 `<-` 42.c
-        R3 `<-` 43.c
-        R4 `<-` 44.c
-        R5 `<-` 45.c
-        R6 `<-` 46.c
-        R7 `<-` 47.c
-        R8 `<-` 48.c
-        R9 `<-` 49.c
-        R10 `<-` 50.c
-        R12 `<-` 52.c
+        R0 arrowAssign 40.c
+        R2 arrowAssign 42.c
+        R3 arrowAssign 43.c
+        R4 arrowAssign 44.c
+        R5 arrowAssign 45.c
+        R6 arrowAssign 46.c
+        R7 arrowAssign 47.c
+        R8 arrowAssign 48.c
+        R9 arrowAssign 49.c
+        R10 arrowAssign 50.c
+        R12 arrowAssign 52.c
         output = multiply4(memory(100), memory(105))
-        multiply5(memory(100), memory(105)) `->` memory(115)
-        memory(120) `<-` multiply6(memory(100), memory(105))
+        multiply5(memory(100), memory(105)) storeInto memory(115)
+        memory(120) arrowAssign multiply6(memory(100), memory(105))
         output = (output + 42.c) - (output + 69.c - output + R2 - R2) + 27.c
         halt()
+        1.c
     }.toAsmString())
 }
 
@@ -29,7 +30,7 @@ fun ArmBuilder.multiply(
     var operand2 by register(second)
     operand1.compare(operand2, "optimizeSmallerValue") {
         greaterThan("swapValues") {
-            swap(operand1 as ArmStorageOperand, operand2 as ArmStorageOperand)
+            operand1 as ArmStorageOperand swap operand2 as ArmStorageOperand
         }
     }
     var originalOperand2 by register()
@@ -67,7 +68,7 @@ fun ArmBuilder.multiply2(
     var operand2 by register(second)
     operand1.compare(operand2, "optimizeSmallerValue") {
         greaterThan("swapValues") {
-            swap(operand1 as ArmStorageOperand, operand2 as ArmStorageOperand)
+            operand1 as ArmStorageOperand swap operand2 as ArmStorageOperand
         }
     }
     result = constant(0)
@@ -93,7 +94,7 @@ fun ArmBuilder.multiply3(
     var operand1 by register(first)
     var operand2 by register(second)
     If(operand1 greaterThan operand2, "swapValues") {
-        swap(operand1 as ArmStorageOperand, operand2 as ArmStorageOperand)
+        operand1 as ArmStorageOperand swap operand2 as ArmStorageOperand
     }
     result = constant(0)
     val mainLoop by labeled
@@ -115,16 +116,16 @@ fun ArmBuilder.multiply4(
 ): ArmCalculationOperand = buildSubroutine("multiply4") {
     var operand1 by register(first)
     var operand2 by register(second)
-    If(operand1 `>` operand2, "swapValues") {
-        operand1.out `<->` operand2.out
+    If(operand1 greaterThan operand2, "swapValues") {
+        operand1.out swap operand2.out
     }
     result = 0.c
-    While(operand1 `>` 0.c, "mainLoop") {
-        If(operand1 `&` 1.c, "oddCheck") {
+    While(operand1 greaterThan 0.c, "mainLoop") {
+        If(operand1 and 1.c, "oddCheck") {
             result += operand2
         }
-        operand2 = operand2 `<<` 1.c
-        operand1 = operand1 `>>` 1.c
+        operand2 = operand2 shr 1.c
+        operand1 = operand1 shl 1.c
     }
 }
 
@@ -133,8 +134,8 @@ fun ArmBuilder.multiply5(
 ): ArmCalculationOperand = buildSubroutine("multiply5") {
     val operand2 = register(second)
     result = 0.c
-    For(first, { it `>` 0.c }, { it `>>=` 1.c; operand2 `<<=` 1.c; }, "mainLoop") { operand1 ->
-        If(operand1 `&` 1.c, "oddCheck") {
+    For(first, { i -> i greaterThan 0.c }, { i -> i shrAssign 1.c; operand2 shlAssign 1.c }, "mainLoop") { operand1 ->
+        If(operand1 and 1.c, "oddCheck") {
             result += operand2
         }
     }
@@ -145,10 +146,10 @@ fun ArmBuilder.multiply6(
 ): ArmCalculationOperand = buildSubroutine("multiply6") {
     var operand2 by register(second)
     result = 0.c
-    for (operand1 in first..1.c `>>` 1.c) loop("multiplicationStep") {
-        If(operand1 `&` 1.c, "oddCheck") {
+    for (operand1 in first..1.c shl 1.c) loop("multiplicationStep") {
+        If(operand1 and 1.c, "oddCheck") {
             result += operand2
         }
-        operand2 = operand2 `<<` 1.c
+        operand2 = operand2 shr 1.c
     }
 }
